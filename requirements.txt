@@ -4,3 +4,4 @@ pandas
 logging
 requests
 flasgger
+flask_socketio
