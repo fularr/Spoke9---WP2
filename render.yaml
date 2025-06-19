@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: backend-google-sheet
+    env: python
+    plan: free
+    buildCommand: ""
+    startCommand: python app_read_from_file_and_googlesheet_eventdrv.py
+    envVars:
+      - key: PORT
+        value: 5000

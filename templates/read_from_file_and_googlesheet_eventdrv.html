@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+
+<html lang="it">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Ricerca ELEMENTO</title>
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet"/>
+    <style>
+            .warning {
+                color: rgb(255, 0, 0);
+                font-size: large;
+                font-weight: bold;
+                border: 1px solid red;
+                padding: 10px;
+                background-color: #fde5e5fd;
+            } 
+            .info {
+                color: rgb(0, 0, 0);
+                font-size: large;
+                font-weight: bold;
+                border: 1px solid rgb(0, 0, 0);
+                padding: 10px;
+                background-color: #dcfdff;
+            }
+    </style>
+        
+    <meta charset="UTF-8">
+    <title>Monitor Google Sheet</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+
+    <script>
+        function toggleInput() {
+            const uploadDiv = document.getElementById('uploadDiv');
+            const sheetDiv = document.getElementById('sheetDiv');
+            const selected = document.querySelector('input[name="source"]:checked').value;
+
+
+            if (selected === 'upload') {
+                uploadDiv.style.display = 'block';
+                //
+                //Abilita il bottone di Cerca
+                //
+                const searchButton = document.getElementById('searchButton');
+                searchButton.hidden = false;
+
+                const resultsDiv = document.getElementById('results');
+                const warningDiv = document.getElementById('warning-message');
+                const itemDiv = document.getElementById('item-message');
+                resultsDiv.innerHTML = ''; // Pulisce i risultati precedenti
+                warningDiv.innerHTML = '';
+                itemDiv.innerHTML = '';
+
+            } else {
+                uploadDiv.style.display = 'none';
+            }
+
+            if (selected === 'sheet') {
+                sheetDiv.style.display = 'block';
+
+                //
+                //Abilita il bottone di Cerca
+                //
+                const searchButton = document.getElementById('searchButton');
+                searchButton.hidden = true;
+
+            } else {
+                sheetDiv.style.display = 'none';
+            }
+        }
+
+    </script>
+</head>
+
+<body>
+
+    <h1>Ricerca ELEMENTO</h1>
+    <br/>
+    <h2>Seleziona la sorgente del file</h2>
+
+    <label><input checked="" name="source" onclick="toggleInput()" type="radio" value="upload"/> Upload file locale</label><br/>
+    <label><input name="source" onclick="toggleInput()" type="radio" value="sheet"/> Google Sheet sul server</label>
+    
+    <div id="uploadDiv" style="margin-top: 20px;">
+        <!-- Modulo di caricamento file -->
+        <form id="uploadForm" enctype="multipart/form-data">
+
+            <input type="file" id="fileInput" name="file" accept=".xlsx">
+
+            <div>
+                <br>
+                <input type="checkbox" id="intestazione" name="intestazione" value="1">
+                <label for="intestazione">File con intestazione (seleziona per confermare)</label>
+                <br>
+            </div>
+
+            <div>
+                <br>
+                <button type="button" id="uploadButton" onclick="uploadFile()" disabled>Carica File</button>
+                <br>
+            </div>
+
+            <br>
+                <div id="upload-message"></div>
+            <br>
+
+        </form>
+    </div>
+
+    <div id="sheetDiv" style="display: none; margin-top: 20px;">
+        <form action="/select_sheet" method="post">
+            <label for="sheet">Seleziona un Google Sheet:</label>
+            <select id="sheet" name="sheet">
+                <option value="sheet1">Foglio 1</option>
+                <option value="sheet2">Foglio 2</option>
+            </select>
+            <button type="submit">Apri</button>
+        </form>
+    </div>
+
+    <div id="dynamic-filters" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;"></div>
+
+        <br/>
+        <!-- <button id="searchButton" onclick="search()" disabled>Cerca</button> -->
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+            <button id="searchButton" onclick="search()" disabled>Cerca</button>
+            <button id="saveButton" onclick="saveResults()" style="display: none;">Salva risultati</button>
+        </div>
+
+        <div id="item-message"></div>
+        <div id="results"></div>
+        <div id="warning-message"></div>
+        
+        <!-- <button id="saveButton" onclick="saveResults()" style="display:none; margin-top: 20px;">Salva risultati</button> -->
+
+    </div>
+
+    <script>
+        const socket = io('http://localhost:5000');
+            socket.on('connect', () => {
+                console.log('Connesso al server WebSocket');
+        });
+
+        socket.on('sheet_updated', (data) => {
+            alert(data.message);
+        });
+    </script>
+
+<script>
+
+        function loadColumnHeaders(formData) {
+            let params = {};
+            const checkbox = document.getElementById('intestazione');
+            if (checkbox.checked) {
+                params['intestazione'] = '1';
+            }
+            let queryString = new URLSearchParams(params).toString();
+
+            fetch(`http://localhost:5000/columns?${queryString}`)
+            .then(response => response.json())
+            .then(columns => {
+                const container = document.getElementById('dynamic-filters');
+                container.innerHTML = '';
+                columns.forEach((col, index) => {
+                    const label = document.createElement('label');
+                    label.textContent = col;
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.id = `searchField${index + 1}`;
+                    input.placeholder = `Inserisci filtro per ${col}`;
+                    input.onchange = search;
+                    input.style.marginRight = '10px';
+                    container.appendChild(label);
+                    container.appendChild(input);
+                });
+            })
+            .catch(error => {
+                console.error('Errore nel caricamento delle colonne:', error);
+            });
+        }
+
+        function getSearchParams() {
+            let params = {};
+            let fields = document.querySelectorAll('.searchField');
+
+            fields.forEach(field => {
+                let key = field.dataset.param;  // legge data-param
+                let value = field.value.trim();
+                if (value !== '') {
+                    params[`param${key}`] = value;
+                }
+            });
+
+            return params;
+        }
+
+        function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            fetch('http://localhost:5000/upload', {
+                method: 'POST',body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                const uploadMessage = document.getElementById('upload-message');
+                if (data.success) {
+                    uploadMessage.textContent = 'File caricato con successo!';
+                    loadColumnHeaders(formData);
+                    
+                    //
+                    //Abilita il bottone di Cerca
+                    //
+                    const searchButton = document.getElementById('searchButton');
+                    searchButton.disabled = false;
+
+                } else {
+                    uploadMessage.textContent = 'Errore nel caricamento del file.';
+                }
+            })
+            .catch(error => {
+                console.error('Errore:', error);
+                const uploadMessage = document.getElementById('upload-message');
+                uploadMessage.textContent = 'Errore nel caricamento del file.';
+            });
+        }
+
+        function search() {
+            const table = document.createElement('table');
+            const warningDiv = document.getElementById('warning-message');
+            const warningMessage = document.createElement('div');
+            const itemDiv = document.getElementById('item-message');
+            const itemMessage = document.createElement('div');
+            table.style.width = '100%';
+            table.style.borderCollapse = 'collapse';
+
+            // Legge dinamicamente tutti i campi input
+            const inputs = document.querySelectorAll('#dynamic-filters input');
+            let params = {};
+            inputs.forEach((input, index) => {
+                if (input.value !== '') {
+                    params[`param${index + 1}`] = input.value;
+                }
+            });
+
+            const checkbox = document.getElementById('intestazione');
+            if (checkbox.checked) {
+                params['intestazione'] = '1';
+            }
+
+            let queryString = new URLSearchParams(params).toString();
+            console.log(`queryString <${queryString}>`);
+            
+            fetch(`http://localhost:5000/search?${queryString}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.innerHTML = ''; // Pulisce i risultati precedenti
+                warningDiv.innerHTML = '';
+                itemDiv.innerHTML = '';
+
+                if (data.length === 0) {
+                    warningMessage.className = 'warning';
+                    let msg = 'Nessun elemento trovato con filtro';
+                    if (Object.keys(params).length > 1) {
+                        msg = 'Nessun elemento trovato con filtri';
+                    }
+                    warningMessage.textContent = msg + ': ' + Object.values(params).join(', ');
+                    warningDiv.appendChild(warningMessage);
+                } else {
+                    itemMessage.className = 'info';
+                    if (data.length === 1) {
+                        itemMessage.textContent = '1 occorrenza trovata';
+                    } else {
+                        itemMessage.textContent = `${data.length} occorrenze trovate`;
+                    }
+                    itemDiv.appendChild(itemMessage);
+
+                    // Crea intestazioni dinamiche
+                    fetch(`http://localhost:5000/columns?${queryString}`)
+                    .then(res => res.json())
+                    .then(headers => {
+                        const table = createTableWithHeader(headers);
+                        data.forEach(row => {
+                            const rowElement = document.createElement('tr');
+                            row.forEach(cell => {
+                                const cellElement = document.createElement('td');
+                                cellElement.textContent = cell;
+                                cellElement.style.border = '1px solid black';
+                                cellElement.style.padding = '8px';
+                                rowElement.appendChild(cellElement);
+                            });
+                            table.appendChild(rowElement);
+                        });
+                        resultsDiv.appendChild(table);
+
+                        const saveButton = document.getElementById('saveButton');
+                        document.getElementById('saveButton').style.display = 'inline-block';
+
+                    });
+                }
+
+            })
+            .catch(error => {
+                console.error('Errore:', error);
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.textContent = 'Si è verificato un errore durante la ricerca (' + error + ')';
+            });
+        }
+
+        function createTableWithHeader(headers) {
+            const table = document.createElement('table');
+            table.style.width = '100%';
+            table.style.borderCollapse = 'collapse';
+            const headerRow = document.createElement('tr');
+            headers.forEach(headerText => {
+                const headerCell = document.createElement('th');
+                headerCell.textContent = headerText;
+                headerCell.style.border = '1px solid black';
+                headerCell.style.padding = '8px';
+                headerCell.style.backgroundColor = '#f2f2f2';
+                headerRow.appendChild(headerCell);
+            });
+            table.appendChild(headerRow);
+            return table;
+        }
+        
+        // Recupera il riferimento al campo di input file
+        const fileInputElement = document.getElementById('fileInput');
+
+        // Recupera i riferimenti ai pulsanti
+        const uploadButton = document.getElementById('uploadButton');
+
+        // Aggiunge un listener per rilevare quando l'utente seleziona un file
+        fileInputElement.addEventListener('change', function () 
+            {
+            
+                console.log('Info: begin');
+
+                // Verifica se è stato selezionato almeno un file
+                const fileIsSelected = fileInputElement.files.length > 0;
+
+                // Abilita o disabilita i pulsanti in base alla selezione del file
+                uploadButton.disabled = !fileIsSelected;
+
+                console.log('Info: end');
+
+            }
+        );
+
+        // Inizializza lo stato del checkbox all'avvio della pagina
+        window.addEventListener('DOMContentLoaded', function () 
+        {
+            const headerCheckbox = document.getElementById('intestazione');
+
+            // Imposta il checkbox come deselezionato all'avvio
+            if (headerCheckbox) {
+                headerCheckbox.checked = false;
+            }
+        }
+        );
+
+        function saveResults() {
+            const params = new URLSearchParams(window.lastSearchParams || {});
+            fetch(`http://localhost:5000/save_results?${params.toString()}`)
+            .then(response => {
+                if (!response.ok) throw new Error("Errore nel salvataggio");
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = "risultati_filtrati.xlsx";
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                })
+            .catch(error => {
+                alert("Errore durante il salvataggio: " + error.message);
+            });
+        }
+
+    </script>
+    </br>
+    <button id="saveButton" onclick="saveResults()" style="display:none; margin-top: 20px;">Salva risultati</button>
+</body>
+
+</html>

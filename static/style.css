@@ -1,0 +1,20 @@
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    border: 1px solid black;
+    padding: 8px;
+    text-align: left;
+}
+
+th {
+    background-color: #dbfbff;
+}
+
+
+body {
+    background: linear-gradient(to right, #fee7e7, #d3e4f7); /* Gradiente da sinistra a destra */
+}
+
