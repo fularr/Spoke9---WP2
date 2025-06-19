@@ -5,3 +5,6 @@ logging
 requests
 flasgger
 flask_socketio
+google-api-python-client
+google-auth
+google-auth-oauthlib
