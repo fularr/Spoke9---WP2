@@ -578,5 +578,5 @@ def search():
 #default porta 5000
 if __name__ == '__main__':
     logger.info('Running: <%s>', os.path.basename(__file__))
-    socketio.run(app, debug=True)
+    socketio.run(app, debug=True, allow_unsafe_werkzeug=True)
 
