@@ -5,5 +5,4 @@ logging
 requests
 flasgger
 flask_socketio
-google.oauth2
-googleapiclient.discovery
+service_account
