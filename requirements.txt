@@ -5,4 +5,3 @@ logging
 requests
 flasgger
 flask_socketio
-service_account
