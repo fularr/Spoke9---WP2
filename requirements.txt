@@ -3,6 +3,5 @@ flask_cors
 pandas
 logging
 requests
-threading
 time
 hashlib
