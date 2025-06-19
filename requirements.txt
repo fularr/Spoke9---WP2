@@ -3,5 +3,4 @@ flask_cors
 pandas
 logging
 requests
-time
 hashlib
