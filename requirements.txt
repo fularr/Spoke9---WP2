@@ -2,7 +2,6 @@ flask
 flask_cors
 pandas
 logging
-re
 requests
 threading
 time
